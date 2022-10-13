@@ -1,4 +1,5 @@
 import pygame  
+import copy
 
 pygame.init()
 
@@ -7,7 +8,10 @@ from time import *
 
 from IA.IA_Full_Random import *
 from IA.IA_Full_Left import *
+from IA.IA_Proba_V1 import *
+from IA.IA_Proba_V2 import *
 
+from display_text import *
 
 class Game():
     def __init__(self, screen, screen_width, screen_height):
@@ -20,21 +24,35 @@ class Game():
         self.main_clock = pygame.time.Clock()
         self.counter = 0
 
-        self.player = ["user", "user"]
-        self.ordi = [IAFullLeft(), IAFullRandom()]
+        self.player = ["ordi", "ordi"]
+        self.ordi = [IAProbaV2(), IAProbaV1()]
 
         self.user_win = [0, 0]
 
-        self.numbers_games = 100
+        self.numbers_games = 10
+
+        self.win_text_red = DisplayText(20, 600, (255, 255, 255), "win: Red", 80)
+        self.win_text_blue = DisplayText(20, 600, (255, 255, 255), "win: Blue", 80)
+        self.win_text_tie = DisplayText(20, 600, (255, 255, 255), "win: Tie", 80)
+
+        self.start_turn = 1
 
         self.InitSimu()
 
     def InitSimu(self):
-        self.playing = 1
+        self.playing = True
         self.winner = None
         self.running = True
         self.grid = self.SetGrid()
-        self.turn = 1
+        self.turn = self.start_turn
+        self.go_next_game = False
+
+        if self.start_turn == 1:
+            self.start_turn = 2
+        else:
+            self.start_turn = 1
+        
+        self.wait_click = False
 
     def SetGrid(self):
         grid = []
@@ -53,12 +71,22 @@ class Game():
                 self.main_clock.tick(60)
                 if self.winner != None:
                     if self.winner == 0:
+                        #equalité
                         pass
+                    elif not self.wait_click:
+                        #execute if win
+                        self.user_win[self.winner - 1] += 1
+                    if self.player[0] == "user" or self.player[1] == "user":
+                        self.wait_click = True
                     else:
-                        self.user_win[self.winner - 2] += 1
+                        self.InitSimu()
+                        break
+                #check if user play
+                if self.go_next_game:
                     self.InitSimu()
                     break
-        print(self.user_win)
+        for i in range(2):
+            print(self.user_win[i], self.ordi[i].GetName())
     
     def HandleEvent(self):
 
@@ -76,15 +104,17 @@ class Game():
                 self.EveryTenMilliSecAction()
             
             #check input clavier
-            if self.game_screen == "play_scene" and self.playing == True:
+            if self.game_screen == "play_scene":
                 #check for 1 input key
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     if event.button == 1:
                         #left button
-                        if self.who_play == "user":
+                        if self.who_play == "user" and self.wait_click == False and self.playing == True:
                             self.mouse_pressed = True
                             mouse_pos = pygame.mouse.get_pos()
                             self.AddToken(mouse_pos[0]//100, self.turn)
+                        elif self.wait_click == True:
+                            self.go_next_game = True
 
                     elif event.button == 3:
                         #right button
@@ -108,13 +138,23 @@ class Game():
         
             #check who play
             self.who_play = self.player[self.turn - 1]
+
+            #print circles
+            self.Draw(self.grid)
         
             #play_ordi
             if self.who_play == "ordi" and self.playing:
-                self.AddToken(self.ordi[self.turn - 1].Calc(self.grid), self.turn)
-            
-            #print circles
-            self.Draw(self.grid)
+                grid_copy = copy.deepcopy(self.grid)
+                pygame.display.flip()
+
+                self.AddToken(self.ordi[self.turn - 1].Calc(grid_copy, self.turn), self.turn)
+            if self.wait_click:
+                if self.winner == 0:
+                    self.win_text_tie.DrawText(self.screen)
+                elif self.winner == 1:
+                    self.win_text_red.DrawText(self.screen)
+                elif self.winner == 2:
+                    self.win_text_blue.DrawText(self.screen)
 
             #check for full
             temp_count_full = 0
@@ -166,7 +206,7 @@ class Game():
 pygame.time.set_timer(pygame.USEREVENT, 10)
 
 screen_width = 700
-screen_height = 600
+screen_height = 700
 
 #set la fenetre
 screen = pygame.display.set_mode((screen_width, screen_height))
